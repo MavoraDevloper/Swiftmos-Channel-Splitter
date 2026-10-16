@@ -1,0 +1,11 @@
+{
+  "name": "divisor-canales-audio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Página web para separar canales de audio (5.1, 7.1…) y guardar cada canal por separado. 100 % en el navegador.",
+  "scripts": {
+    "start": "python3 serve.py 8080",
+    "test": "node --test tests/"
+  }
+}

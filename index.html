@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Separador de canales de audio: abre un archivo FLAC, M4A, EAC3, WAV… y exporta cada canal por separado (5.1, 7.1, Atmos…). Todo en tu navegador.">
+<title>Divisor de Canales de Audio</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Cg fill='%23fff'%3E%3Crect x='6' y='13' width='3' height='6' rx='1.5'/%3E%3Crect x='11.5' y='9' width='3' height='14' rx='1.5'/%3E%3Crect x='17' y='6' width='3' height='20' rx='1.5'/%3E%3Crect x='22.5' y='11' width='3' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Saltar al contenido</a>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="8" fill="url(#g)"/>
+      <g fill="#fff">
+        <rect x="6" y="13" width="3" height="6" rx="1.5"/>
+        <rect x="11.5" y="9" width="3" height="14" rx="1.5"/>
+        <rect x="17" y="6" width="3" height="20" rx="1.5"/>
+        <rect x="22.5" y="11" width="3" height="10" rx="1.5"/>
+      </g>
+      <defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32">
+        <stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/>
+      </linearGradient></defs>
+    </svg>
+    <div class="brand-text">
+      <h1>Divisor de Canales</h1>
+      <p>Estéreo · 5.1 · 7.1 · Atmos → un archivo por canal</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="engineBadge" class="badge badge-muted" title="Todo el procesado ocurre en tu navegador; los archivos nunca se suben a ningún servidor.">100 % local</span>
+    <button id="themeToggle" class="btn btn-ghost btn-icon" type="button" title="Cambiar tema" aria-label="Cambiar tema">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-sun"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M19.1 4.9l-1.9 1.9M6.8 17.2l-1.9 1.9"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ══════════════════ 1. SELECCIÓN DE ARCHIVO ══════════════════ -->
+  <section class="panel" aria-labelledby="srcTitle">
+    <div class="panel-head">
+      <h2 id="srcTitle"><span class="step">1</span> Archivo de audio</h2>
+    </div>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+         aria-label="Seleccionar o soltar un archivo de audio">
+      <svg class="dz-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+      </svg>
+      <p class="dz-title">Arrastra tu audio aquí</p>
+      <p class="dz-sub">o</p>
+      <button id="pickBtn" class="btn btn-primary btn-lg" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h3.2l1.6 2H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>
+        Seleccionar archivo
+      </button>
+      <p class="dz-formats">
+        Formatos: <b>FLAC</b>, <b>WAV</b>, <b>M4A</b>/AAC, <b>EAC3</b>/AC3, <b>MP3</b>, <b>OGG</b>/Opus, <b>AIFF</b>, <b>DTS</b>, <b>TrueHD</b>, <b>APE</b>, <b>WMA</b>, <b>MKA</b>…
+      </p>
+      <input id="fileInput" type="file" multiple hidden
+             accept="audio/*,.flac,.wav,.wave,.m4a,.mp4,.m4b,.aac,.eac3,.ec3,.ac3,.mp3,.ogg,.oga,.opus,.aiff,.aif,.aifc,.caf,.au,.wma,.ape,.wv,.mka,.mkv,.dts,.thd,.truehd,.amr,.ra,.dsf,.dff,.mp2,.webm">
+    </div>
+
+    <div id="trackListWrap" class="tracklist-wrap" hidden>
+      <div class="tracklist-head">
+        <h3>Archivos cargados <span id="trackCount" class="pill">0</span></h3>
+        <button id="clearTracks" class="btn btn-ghost btn-sm" type="button">Vaciar</button>
+      </div>
+      <ul id="trackList" class="tracklist"></ul>
+    </div>
+  </section>
+
+  <!-- ══════════════════ 2. INFORMACIÓN ══════════════════ -->
+  <section id="infoPanel" class="panel" aria-labelledby="infoTitle" hidden>
+    <div class="panel-head">
+      <h2 id="infoTitle"><span class="step">2</span> Información del archivo</h2>
+      <span id="engineTag" class="badge"></span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta"><dt>Archivo</dt><dd id="mName">—</dd></div>
+      <div class="meta"><dt>Duración</dt><dd id="mDuration">—</dd></div>
+      <div class="meta"><dt>Frecuencia</dt><dd id="mRate">—</dd></div>
+      <div class="meta"><dt>Canales</dt><dd id="mChannels">—</dd></div>
+      <div class="meta"><dt>Tamaño</dt><dd id="mSize">—</dd></div>
+      <div class="meta"><dt>Resolución</dt><dd id="mDepth">—</dd></div>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">Distribución de canales (WAV / FFmpeg)</span>
+        <select id="layoutSelect"></select>
+      </label>
+      <p class="hint" id="layoutHint"></p>
+    </div>
+  </section>
+
+  <!-- ══════════════════ 3. MONITOR ══════════════════ -->
+  <section id="mixPanel" class="panel" aria-labelledby="mixTitle" hidden>
+    <div class="panel-head">
+      <h2 id="mixTitle"><span class="step">3</span> Escucha por canal</h2>
+      <div class="panel-head-actions">
+        <button id="soloNone" class="btn btn-ghost btn-sm" type="button">Quitar solo</button>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button id="playBtn" class="btn btn-primary btn-icon-lg" type="button" aria-label="Reproducir">
+        <svg class="ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5Z"/></svg>
+        <svg class="ico-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M7 4.5h4v15H7zM13 4.5h4v15h-4z"/></svg>
+      </button>
+      <button id="stopBtn" class="btn btn-ghost btn-icon" type="button" aria-label="Detener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+      </button>
+      <div class="seek">
+        <input id="seek" class="seek-input" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición de reproducción">
+        <div class="seek-times"><span id="tCur">0:00.000</span><span id="tDur">0:00.000</span></div>
+      </div>
+      <label class="check compact"><input id="loopChk" type="checkbox"> <span>Bucle</span></label>
+      <label class="field field-inline" title="Volumen de salida general">
+        <span class="field-label">Salida</span>
+        <input id="masterGain" class="range" type="range" min="0" max="150" value="90">
+        <output id="masterGainOut" class="range-out">0.0 dB</output>
+      </label>
+    </div>
+
+    <p class="hint" id="playHint"></p>
+
+    <div class="mix-head">
+      <span class="col-name">Canal</span>
+      <span class="col-wave">Forma de onda</span>
+      <span class="col-meter">Nivel</span>
+      <span class="col-acts">Acciones</span>
+    </div>
+    <div id="chStrip" class="ch-strip"></div>
+  </section>
+
+  <!-- ══════════════════ 4. EXPORTAR ══════════════════ -->
+  <section id="expPanel" class="panel" aria-labelledby="expTitle" hidden>
+    <div class="panel-head">
+      <h2 id="expTitle"><span class="step">4</span> Guardar cada canal</h2>
+    </div>
+
+    <div class="opts-grid">
+      <label class="field">
+        <span class="field-label">Formato de salida</span>
+        <select id="fmtSelect"></select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Frecuencia de muestreo</span>
+        <select id="rateSelect"></select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Numeración de archivos</span>
+        <select id="numSelect">
+          <option value="0">Desde 0 (canal_0…)</option>
+          <option value="1">Desde 1 (canal_1…)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Patrón de nombre</span>
+        <input id="nameTpl" class="text-input" type="text" spellcheck="false"
+               value="{name}_{chn}_{ch}.{ext}">
+        <span class="field-help">Tokens: <code>{name}</code> <code>{chn}</code> <code>{ch}</code> <code>{ext}</code> <code>{sr}</code></span>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Alcance</span>
+        <select id="scopeSelect">
+          <option value="current">Solo el archivo abierto</option>
+          <option value="all">Todos los archivos cargados</option>
+        </select>
+      </label>
+
+      <div class="field field-checks">
+        <span class="field-label">Opciones</span>
+        <label class="check"><input id="zipChk" type="checkbox" checked> <span>Empaquetar todo en un <b>.zip</b></span></label>
+        <label class="check"><input id="ditherChk" type="checkbox" checked> <span>Dither TPDF al bajar a 16 bits</span></label>
+        <label class="check"><input id="limiterChk" type="checkbox" checked> <span>Normalizar picos a −0.3 dBFS si hay recorte</span></label>
+      </div>
+    </div>
+
+    <details id="groupsBox" class="groups">
+      <summary><b>Grupos de canales</b> <span class="pill" id="groupCount">0</span>
+        <small>Combina varios canales en un mismo archivo (por ejemplo, extraer el centro o los fronts).</small>
+      </summary>
+      <div class="groups-body">
+        <div class="groups-actions">
+          <input id="groupName" class="text-input" type="text" placeholder="Nombre del grupo (p. ej. stereo_izq_dcha)" spellcheck="false">
+          <button id="addGroup" class="btn btn-soft" type="button">Crear con la selección</button>
+          <button id="clearGroups" class="btn btn-ghost btn-sm" type="button">Vaciar grupos</button>
+        </div>
+        <label class="field field-inline group-mode">
+          <span class="field-label">Mezcla</span>
+          <select id="groupMode">
+            <option value="mix">Promediar canales</option>
+            <option value="copy">Copiar sin mezclar</option>
+          </select>
+        </label>
+        <div id="groupList" class="group-list"><p class="empty">Sin grupos. Marca canales arriba con la casilla y pulsa «Crear con la selección».</p></div>
+      </div>
+    </details>
+
+    <div class="export-actions">
+      <button id="exportBtn" class="btn btn-primary btn-lg" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Exportar canales
+      </button>
+      <button id="downloadAllBtn" class="btn btn-soft" type="button" hidden>Descargar todo</button>
+      <span id="exportPreview" class="hint"></span>
+    </div>
+
+    <div id="resultsWrap" class="results-wrap" hidden>
+      <div class="results-head">
+        <h3>Archivos generados</h3>
+        <button id="resultsToggle" class="btn btn-ghost btn-sm" type="button">Contraer</button>
+      </div>
+      <ul id="resultsList" class="results"></ul>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p><b>Privacidad:</b> todo el audio se procesa con la Web Audio API dentro de tu navegador. Ningún archivo se sube a internet.</p>
+    <p><b>Atajos:</b> <kbd>Espacio</kbd> reproducir/detener · <kbd>1</kbd>–<kbd>9</kbd> aislar canal · <kbd>0</kbd> todos los canales · <kbd>Esc</kbd> salir del solo.</p>
+  </footer>
+</main>
+
+<!-- Barra de progreso global -->
+<div id="busy" class="busy" hidden>
+  <div class="busy-card" role="alertdialog" aria-live="polite" aria-labelledby="busyLabel">
+    <p id="busyLabel" class="busy-label">Procesando…</p>
+    <div class="progress"><div id="bar" class="bar" style="width:0%"></div></div>
+    <p id="busySub" class="busy-sub"></p>
+    <div class="busy-actions">
+      <button id="cancelBtn" class="btn btn-ghost btn-sm" type="button">Cancelar</button>
+      <button id="closeBusy" class="btn btn-soft btn-sm" type="button" hidden>Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
