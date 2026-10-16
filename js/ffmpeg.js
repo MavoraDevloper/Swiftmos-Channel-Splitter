@@ -21,6 +21,16 @@ let instance = null;
 /** @type {Promise<any> | null} */
 let loading = null;
 let lastLog = '';
+let engineFailed = false;
+
+/**
+ * ¿Sigue disponible el motor de conversión? Si falló una vez (sin red, por
+ * ejemplo) ya no insistir. Solo se usa para explicar el fallo en pasos de
+ * conversión, nunca se muestra el nombre del motor.
+ */
+export function isEngineAvailable() {
+  return !engineFailed;
+}
 
 export const isLoaded = () => instance?.loaded === true;
 
@@ -66,6 +76,9 @@ export async function getFFmpeg(onProgress) {
 
   try {
     return await loading;
+  } catch (err) {
+    engineFailed = true;
+    throw err;
   } finally {
     loading = null;
   }
@@ -81,6 +94,7 @@ export async function terminateFFmpeg() {
     instance = null;
   }
   lastLog = '';
+  engineFailed = false;
 }
 
 /**

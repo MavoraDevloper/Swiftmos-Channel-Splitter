@@ -15,7 +15,7 @@ import { encodeWav } from '../js/wav-encoder.js';
 import { makeZip, crc32 } from '../js/zip.js';
 import { fmtBytes, fmtTime, sanitizeFilename, applyNameTemplate, mixChannels, normalizeIfClipping, peakOf } from '../js/utils.js';
 import { defaultLayoutFor, layoutsForCount, channelColor } from '../js/channel-layouts.js';
-import { estimateDecodedBytes, isNativelySupported } from '../js/audio-engine.js';
+import { estimateDecodedBytes, isNativelySupported, channelPlacement } from '../js/audio-engine.js';
 
 const exec = promisify(execFile);
 const TMP = path.join(tmpdir(), 'divisor-test');
@@ -271,4 +271,38 @@ test('motor: detección de formatos con soporte nativo', () => {
   assert.equal(isNativelySupported({ container: 'E-AC3' }), false);
   assert.equal(isNativelySupported({ container: 'Matroska' }), false);
   assert.equal(isNativelySupported({}), false);
+});
+
+/* ─────────────────── colocación estéreo de cada canal ─────────────────── */
+
+test('monitor: cada canal suena donde corresponde', () => {
+  const L = [1, 0], R = [0, 1], C = [1, 1];
+
+  // 5.1 → L R C LFE SL SR
+  assert.deepEqual(channelPlacement('L'), L);
+  assert.deepEqual(channelPlacement('R'), R);
+  assert.deepEqual(channelPlacement('C'), C);
+  assert.deepEqual(channelPlacement('FC'), C, 'el frontal central va a ambos lados');
+  assert.deepEqual(channelPlacement('LFE'), C, 'el LFE no tiene dirección');
+  assert.deepEqual(channelPlacement('SL'), L, 'surround izquierdo → izquierda');
+  assert.deepEqual(channelPlacement('SR'), R, 'surround derecho → derecha');
+
+  // 7.1 → L R C LFE BL BR SL SR
+  assert.deepEqual(channelPlacement('BL'), L);
+  assert.deepEqual(channelPlacement('BR'), R);
+
+  // 7.1.4 → alturas y surrounds traseros
+  assert.deepEqual(channelPlacement('LSS'), L);
+  assert.deepEqual(channelPlacement('RSS'), R);
+  assert.deepEqual(channelPlacement('LTF'), L);
+  assert.deepEqual(channelPlacement('RTF'), R);
+  assert.deepEqual(channelPlacement('TFL'), L);
+  assert.deepEqual(channelPlacement('BC'), C, 'trasero central');
+
+  // casos límite
+  assert.deepEqual(channelPlacement('M'), C, 'archivo mono');
+  assert.deepEqual(channelPlacement('FL'), L);
+  assert.deepEqual(channelPlacement('FR'), R);
+  assert.deepEqual(channelPlacement('CH3'), C, 'genérico sin dirección → centro');
+  assert.deepEqual(channelPlacement(undefined), C);
 });

@@ -2,7 +2,7 @@
  * channel-layouts.js — Distribuciones de canales y sus nombres.
  *
  * El orden importa: cada canal del archivo se exporta tal cual aparece en el
- * búfer decodificado. Los nombres siguen la convención de FFmpeg / RIFF WAVE,
+ * búfer decodificado. Los nombres siguen la convención de RIFF WAVE / FFmpeg,
  * que es la que usan casi todos los programas al escribir audio multicanal.
  */
 
@@ -55,7 +55,7 @@ export const LAYOUTS = [
   },
   {
     id: '5.1',
-    name: '5.1 — L R C LFE SL SR (WAVE / FFmpeg)',
+    name: '5.1 — L R C LFE SL SR (WAVE)',
     channels: [
       { code: 'L', name: 'Frontal izquierdo', short: 'Frontal izq.' },
       { code: 'R', name: 'Frontal derecho', short: 'Frontal der.' },
@@ -92,7 +92,7 @@ export const LAYOUTS = [
   },
   {
     id: '7.1',
-    name: '7.1 — L R C LFE BL BR SL SR (FFmpeg)',
+    name: '7.1 — L R C LFE BL BR SL SR',
     channels: [
       { code: 'L', name: 'Frontal izquierdo', short: 'Frontal izq.' },
       { code: 'R', name: 'Frontal derecho', short: 'Frontal der.' },

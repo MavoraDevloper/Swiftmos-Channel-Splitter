@@ -5,7 +5,7 @@
 import {
   decodeAudioFile, computePeaks, resampleChannels, playbackContext, ChannelMonitor,
 } from './audio-engine.js';
-import { getFFmpeg, encodeWithFFmpeg, terminateFFmpeg, isLoaded } from './ffmpeg.js';
+import { getFFmpeg, encodeWithFFmpeg, isEngineAvailable } from './ffmpeg.js';
 import { encodeWav } from './wav-encoder.js';
 import { makeZip } from './zip.js';
 import { defaultLayoutFor, layoutsForCount, channelColor } from './channel-layouts.js';
@@ -136,6 +136,27 @@ el.cancelBtn.addEventListener('click', () => {
 el.closeBusy.addEventListener('click', busyHide);
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/**
+ * Convierte un error técnico en un mensaje que pueda leer una persona, sin
+ * destapar detalles internos (nombres de librerías, registros del motor…).
+ */
+function friendlyError(err) {
+  const msg = String(err?.message ?? err ?? '');
+  if (/ffmpeg|wasi|wasm|Worker|transcod|terminó con código/i.test(msg)) {
+    return 'No se pudo procesar el audio. Prueba a convertirlo a WAV o FLAC y vuelve a intentarlo.';
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+    return 'Falta conexión a internet. Necesario solo para formatos comprimidos; el WAV no lo requiere.';
+  }
+  if (/memory|out of range|allocation/i.test(msg)) {
+    return 'No hay memoria suficiente en la pestaña para este archivo. Prueba con uno más corto.';
+  }
+  if (/NotSupportedError|decodeAudioData|unsupported/i.test(msg)) {
+    return 'El navegador no sabe abrir este formato de audio.';
+  }
+  return (msg.split('\n')[0] || 'Error desconocido').slice(0, 140);
+}
 
 /* ═══════════════════════ 1. Carga de archivos ═══════════════════════ */
 
@@ -274,7 +295,7 @@ async function openTrack(track, makeCurrent = true) {
       state.peaks = computePeaks(buffer);
       state.selection.clear();
       state.groups = [];
-      state.monitor = new ChannelMonitor(buffer);
+      state.monitor = new ChannelMonitor(buffer, state.layout);
       state.monitor.onEnded = () => syncTransport();
       buildWorkspace();
       busyHide();
@@ -283,7 +304,7 @@ async function openTrack(track, makeCurrent = true) {
   } catch (err) {
     console.error(err);
     track.status = 'error';
-    track.error = err?.message?.split('\n')[0] ?? 'No se pudo leer';
+    track.error = friendlyError(err);
     if (makeCurrent) {
       busyDone('No se pudo abrir el archivo');
       setTimeout(busyHide, 2600);
@@ -325,8 +346,9 @@ function buildWorkspace() {
     ? `${info.bitDepth} <small>bits</small>`
     : '—';
 
-  el.engineTag.textContent = info.engine === 'ffmpeg' ? 'decodificado con ffmpeg.wasm' : 'decodificado por el navegador';
-  el.engineTag.className = `badge ${info.engine === 'ffmpeg' ? 'badge-ff' : ''}`;
+  el.engineTag.textContent = [info.codec || info.container, info.sampleRate ? `${info.sampleRate / 1000} kHz` : null]
+    .filter(Boolean).join(' · ') || 'audio';
+  el.engineTag.className = 'badge';
 
   // Distribución de canales
   el.layoutSelect.innerHTML = '';
@@ -342,6 +364,11 @@ function buildWorkspace() {
   el.layoutHint.textContent = candidates.length > 1
     ? 'Si los nombres no coinciden con tu archivo, prueba la otra distribución.'
     : 'Los nombres siguen el orden de canales del archivo.';
+
+  // El monitor ajusta la salida para que la suma de N canales no sature:
+  // reflejamos ese valor en el control para que no haya sorpresas.
+  el.masterGain.value = String(Math.round(state.monitor.defaultMasterGain * 100));
+  el.masterGainOut.textContent = fmtDb(state.monitor.defaultMasterGain);
 
   buildRateOptions();
   buildChannelStrip();
@@ -362,6 +389,7 @@ el.layoutSelect.addEventListener('change', () => {
   const found = layoutsForCount(state.buffer.numberOfChannels).find((l) => l.id === el.layoutSelect.value);
   if (!found) return;
   state.layout = found;
+  state.monitor?.setLayout(state.layout);
   buildChannelStrip();
   renderGroups();
 });
@@ -457,7 +485,7 @@ function buildChannelStrip() {
 
   applySoloState();
   el.playHint.textContent = state.buffer.numberOfChannels > 2
-    ? 'Tu equipo probablemente reproducirá una mezcla a estéreo: usa «S» para comprobar que cada canal suena aislado.'
+    ? 'Escucha espacial: el centro y el LFE suenan en los dos lados, el canal izquierdo solo a la izquierda y el derecho (y los surrounds) solo a la derecha. Aísla con «S» para comprobar cada canal.'
     : 'Pulsa espacio para reproducir y haz clic en la forma de onda para saltar de sitio.';
 }
 
@@ -662,7 +690,7 @@ el.clearGroups.addEventListener('click', () => {
 for (const fmt of OUTPUT_FORMATS) {
   const opt = document.createElement('option');
   opt.value = fmt.id;
-  opt.textContent = fmt.native ? fmt.label : `${fmt.label} · ffmpeg`;
+  opt.textContent = fmt.label;
   opt.dataset.native = fmt.native ? '1' : '0';
   el.fmtSelect.appendChild(opt);
 }
@@ -802,7 +830,7 @@ async function runExport() {
       busyHide();
     } else {
       console.error(err);
-      toast(`Error al exportar: ${err.message}`, 'err', 10000);
+      toast(`Error al exportar: ${friendlyError(err)}`, 'err', 10000);
       busyDone('Error al exportar');
     }
   } finally {
@@ -836,7 +864,7 @@ async function emit(filename, channels, sampleRate, fmt, signal, frac) {
     await sleep(0); // deja pintar la barra de progreso
     blob = encodeWav(data, sampleRate, { bitDepth: fmt.bitDepth, dither: useDither });
   } else {
-    busySub(`${filename} — ffmpeg`);
+    busySub(`${filename} — convirtiendo…`);
     const wav = encodeWav(data, sampleRate, { bitDepth: 24 });
     const bytes = await encodeWithFFmpeg(await wav.arrayBuffer(), fmt, {
       signal,
@@ -929,7 +957,10 @@ async function quickDownloadChannel(index) {
     setTimeout(busyHide, 1500);
   } catch (err) {
     console.error(err);
-    toast(`No se pudo guardar: ${err.message}`, 'err');
+    const extra = !isEngineAvailable() && !fmt.native
+      ? ' Los formatos comprimidos requieren descargar un componente adicional; el WAV no lo necesita.'
+      : '';
+    toast(`No se pudo guardar: ${friendlyError(err)}.${extra}`, 'err', 10000);
     busyHide();
   }
 }
@@ -980,26 +1011,12 @@ el.themeToggle.addEventListener('click', () => {
   }
 })();
 
-// Precarga silenciosa de ffmpeg.wasm en segundo plano: si más tarde hace falta
-// (E-AC3, DTS…) ya está en memoria. Si falla, la app sigue con WAV.
+// Precarga silenciosa del motor de conversión en segundo plano: si más tarde hace
+// falta (E-AC3, DTS…) ya está en memoria. Si falla, la app sigue con WAV y no se
+// molesta al usuario: el aviso aparece solo si luego realmente se necesita.
 if ('requestIdleCallback' in window) {
-  requestIdleCallback(() => {
-    getFFmpeg(() => {}).then(() => {
-      el.engineBadge.textContent = '100 % local · ffmpeg listo';
-    }).catch(() => {
-      el.engineBadge.title = 'ffmpeg.wasm no disponible: solo se podrán exportar WAV.';
-    });
-  }, { timeout: 8000 });
+  requestIdleCallback(() => { getFFmpeg(() => {}).catch(() => { /* seguirá funcionando con WAV */ }); }, { timeout: 8000 });
 }
-
-el.engineBadge.addEventListener('dblclick', async () => {
-  if (isLoaded()) {
-    await terminateFFmpeg();
-    el.engineBadge.title = 'ffmpeg liberado';
-    el.engineBadge.textContent = '100 % local';
-    toast('Memoria de ffmpeg.wasm liberada.', 'ok');
-  }
-});
 
 updateExportPreview();
 

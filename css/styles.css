@@ -1,5 +1,5 @@
 /* ============================================================
-   Divisor de Canales de Audio — hoja de estilos
+   Swiftmos · Channel Splitter — hoja de estilos
    ============================================================ */
 
 /* ---------- Tokens ---------- */
@@ -95,6 +95,7 @@ kbd {
 .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
 .brand-mark { width: 38px; height: 38px; flex: none; border-radius: 10px; box-shadow: var(--shadow); }
 .brand-text h1 { font-size: 17px; font-weight: 650; letter-spacing: -.2px; }
+.brand-sep { color: var(--txt-faint); font-weight: 400; margin: 0 .3em; }
 .brand-text p { font-size: 12.5px; color: var(--txt-faint); }
 @media (max-width: 560px) { .brand-text p { display: none; } }
 
@@ -106,7 +107,6 @@ kbd {
   white-space: nowrap;
 }
 .badge-muted { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
-.badge-ff   { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
 
 /* ---------- Estructura ---------- */
 main {
